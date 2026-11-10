@@ -1,0 +1,1249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spatial Harness</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Spatial Harness (NeurIPS 2026) represents scenes as explicit, executable world states and grounds VLM spatial reasoning in physics-engine feedback.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Spatial Harness: Grounding Spatial Reasoning in Executable World States with Physics Engines">
+<meta property="og:description" content="A Perceiver builds an explicit world state from images and the question; a Reasoner answers by executing viewpoint changes, measurements and renders in MuJoCo. NeurIPS 2026.">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a76a8'/%3E%3Cpath d='M9 23 16 8l7 15z' fill='%23fff'/%3E%3Crect x='19' y='18' width='6' height='6' fill='%23f2b928'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400..900&family=JetBrains+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..600;1,8..60,400..600&display=swap">
+<style>
+/* Layout: a cool cognitive-map grid page; 1120px frame, 680px prose; the live engine console is the one bold element. */
+:root {
+  --bg: #f4f7f9;
+  --surface: #ffffff;
+  --ink: #10202b;
+  --ink-2: #3d4c57;
+  --muted: #64737e;
+  --rule: #d8e1e7;
+  --grid: #e2e9ee;
+  --engine: #1a76a8;
+  --engine-text: #12659a;
+  --engine-wash: #e2eef5;
+  --imagine: #c4472b;
+  --object: #f2b928;
+  --mark-base: #a3adb5;
+  --mark-sh: #1a76a8;
+  --plate: #ffffff;
+  --code-bg: #0f1c26;
+  --code-chip: #172a38;
+  --code-ink: #d5e2ea;
+  --code-dim: #7f95a4;
+  --code-accent: #7cc4ea;
+  --code-ok: #9bd68f;
+  --render-sky: #c8dfee;
+  --render-floor: #33414c;
+  --render-ring: #4d6372;
+  --p-wall: #e2706b;
+  --p-window: #59c06a;
+  --p-table: #e9c546;
+  --on-fill: #ffffff;
+  --shadow: 0 1px 2px rgb(16 32 43 / .05), 0 12px 32px rgb(16 32 43 / .07);
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-ui: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  --f-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --frame: 1120px;
+  --prose: 680px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d151c; --surface: #131e27; --ink: #e4ecf1; --ink-2: #b3c0c9; --muted: #8696a2;
+    --rule: #24323d; --grid: #1b2833; --engine: #3d95c6; --engine-text: #7cc0e6; --engine-wash: #16303f;
+    --imagine: #e2694c; --mark-base: #5d6973; --mark-sh: #3d95c6; --plate: #eef2f5;
+    --code-bg: #091118; --code-chip: #13212d; --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 12px 32px rgb(0 0 0 / .35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d151c; --surface: #131e27; --ink: #e4ecf1; --ink-2: #b3c0c9; --muted: #8696a2;
+  --rule: #24323d; --grid: #1b2833; --engine: #3d95c6; --engine-text: #7cc0e6; --engine-wash: #16303f;
+  --imagine: #e2694c; --mark-base: #5d6973; --mark-sh: #3d95c6; --plate: #eef2f5;
+  --code-bg: #091118; --code-chip: #13212d; --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 12px 32px rgb(0 0 0 / .35);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--f-body); font-size: 1.0625rem; line-height: 1.62;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+img { max-width: 100%; height: auto; display: block; }
+[hidden] { display: none !important; }
+a { color: var(--engine-text); text-underline-offset: .18em; text-decoration-thickness: 1px; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 2px solid var(--engine); outline-offset: 2px; border-radius: 3px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+p { margin: 0; }
+code, pre { font-family: var(--f-mono); }
+[id] { scroll-margin-top: 72px; }
+
+.frame {
+  max-width: var(--frame); margin-inline: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* ---------- top bar ---------- */
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--rule);
+}
+.topbar-in { display: flex; align-items: center; gap: 24px; min-height: 56px; }
+.wordmark {
+  display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink);
+  font-family: var(--f-display); font-weight: 750; font-size: 1.02rem; letter-spacing: -.01em;
+}
+.wordmark svg { width: 22px; height: 22px; flex: none; }
+.topnav { display: flex; gap: 22px; margin-left: auto; font-family: var(--f-ui); font-size: .9rem; }
+.topnav a { color: var(--ink-2); text-decoration: none; }
+.topnav a:hover { color: var(--ink); }
+.gh-link {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+  font-family: var(--f-ui); font-size: .875rem; font-weight: 600; color: var(--ink); text-decoration: none;
+  border: 1px solid var(--rule); background: var(--surface);
+}
+.gh-link svg { width: 16px; height: 16px; }
+@media (max-width: 760px) { .topnav { display: none; } .gh-link { margin-left: auto; } }
+
+/* ---------- hero ---------- */
+.hero { position: relative; padding-block: 72px 44px; overflow: hidden; }
+.hero::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 44px 44px; background-position: -1px -1px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 100% at 90% 0%, #000 25%, transparent 72%);
+  mask-image: radial-gradient(ellipse 75% 100% at 90% 0%, #000 25%, transparent 72%);
+}
+.hero .frame { position: relative; }
+.venue {
+  display: inline-flex; align-items: center; gap: 10px; margin-bottom: 22px;
+  font-family: var(--f-mono); font-size: .78rem; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--engine-text);
+}
+.venue::before { content: ""; width: 9px; height: 9px; background: var(--object); outline: 1.5px solid var(--ink); outline-offset: -1.5px; }
+.hero h1 {
+  font-family: var(--f-display); font-weight: 800;
+  font-size: clamp(3rem, 10vw, 7rem); line-height: .98; letter-spacing: -.03em;
+}
+.subtitle {
+  margin-top: 18px; max-width: 30em;
+  font-family: var(--f-body); font-size: clamp(1.2rem, 2.3vw, 1.6rem); line-height: 1.3; color: var(--ink-2);
+}
+.hero-meta { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 28px 48px; margin-top: 36px; align-items: start; }
+.byline { display: grid; gap: 8px; font-family: var(--f-ui); }
+.authors { display: flex; flex-wrap: wrap; gap: 4px 22px; list-style: none; margin: 0; padding: 0; font-size: 1.05rem; font-weight: 600; }
+.authors sup, .affil sup, .notes sup { font-size: .68em; font-weight: 500; color: var(--muted); margin-left: 1px; }
+.affil, .notes { font-size: .9rem; color: var(--ink-2); }
+.affil span { display: block; }
+.notes { color: var(--muted); font-size: .82rem; }
+.links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; cursor: pointer;
+  font-family: var(--f-ui); font-size: .92rem; font-weight: 600; line-height: 1.2; text-decoration: none;
+  color: var(--ink); background: var(--surface); border: 1px solid var(--rule);
+  transition: border-color .15s, background .15s, transform .15s;
+}
+.btn:hover { border-color: var(--ink-2); }
+.btn:active { transform: translateY(1px); }
+.btn svg { width: 16px; height: 16px; flex: none; }
+.btn-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn-primary:hover { background: var(--engine); border-color: var(--engine); color: var(--on-fill); }
+.lede { max-width: var(--prose); font-size: 1.06rem; color: var(--ink-2); }
+@media (max-width: 900px) { .hero-meta { grid-template-columns: minmax(0, 1fr); } }
+.lede strong { color: var(--ink); font-weight: 600; }
+
+/* ---------- sections ---------- */
+section.block { padding-block: 84px; border-top: 1px solid var(--rule); }
+.sec-head { display: grid; gap: 12px; max-width: var(--prose); margin-bottom: 36px; }
+.eyebrow { font-family: var(--f-mono); font-size: .75rem; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h2 { font-family: var(--f-display); font-weight: 760; font-size: clamp(1.9rem, 3.8vw, 2.7rem); line-height: 1.08; letter-spacing: -.022em; }
+h3 { font-family: var(--f-display); font-weight: 680; font-size: 1.15rem; line-height: 1.28; letter-spacing: -.008em; }
+.sec-lede { color: var(--ink-2); }
+.caption { font-family: var(--f-ui); font-size: .875rem; line-height: 1.5; color: var(--muted); max-width: 80ch; }
+.caption b { color: var(--ink-2); font-weight: 650; }
+
+/* ---------- engine console ---------- */
+.demo { padding-block: 8px 84px; }
+.console { background: var(--surface); border: 1px solid var(--rule); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+.question { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px 24px; padding: 22px 24px 20px; border-bottom: 1px solid var(--rule); }
+.q-main { display: grid; gap: 14px; min-width: 0; }
+.q-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.q-text { font-size: 1.12rem; line-height: 1.45; }
+.q-tag { font-family: var(--f-mono); font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-right: 10px; vertical-align: 2px; }
+.options { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; font-family: var(--f-ui); font-size: .9rem; }
+.options li {
+  display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 6px; border-radius: 999px;
+  border: 1px solid var(--rule); color: var(--ink-2); transition: background .25s, border-color .25s, color .25s;
+}
+.options b { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--bg); font-size: .78rem; color: var(--ink); }
+.options li.is-answer { border-color: var(--engine); background: var(--engine-wash); color: var(--ink); }
+.options li.is-answer b { background: var(--engine); color: var(--on-fill); }
+.options li.is-answer::after { content: "✓"; color: var(--engine-text); font-weight: 700; }
+.console-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
+.pane { margin: 0; min-width: 0; }
+.pane-label {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; align-items: baseline; white-space: nowrap;
+  font-family: var(--f-mono); font-size: .74rem; letter-spacing: .04em; color: var(--muted);
+}
+.pane-label span { color: var(--ink-2); }
+.map-pane { padding: 18px 20px 16px; border-right: 1px solid var(--rule); display: grid; gap: 10px; align-content: start; }
+.map-pane svg { width: 100%; height: auto; max-width: 440px; justify-self: center; }
+.pose { font-family: var(--f-mono); font-size: .8rem; color: var(--ink-2); text-align: center; }
+.map-pane .caption { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--rule); font-size: .82rem; }
+.right-col { display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+.render-pane { padding: 18px 20px 16px; display: grid; gap: 10px; border-bottom: 1px solid var(--rule); }
+.screen { position: relative; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 8px; overflow: hidden; background: var(--code-bg); }
+.screen svg, .screen img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.screen img { object-fit: contain; }
+.pane-label b { font-weight: inherit; }
+.phases { list-style: none; margin: 0; padding: 10px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 30px; border-bottom: 1px solid var(--rule); font-family: var(--f-ui); font-size: .84rem; color: var(--muted); }
+.phases li { position: relative; display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px; border: 1px solid transparent; transition: background .3s, color .3s, border-color .3s; }
+.phases li + li::before { content: "→"; position: absolute; left: -22px; color: var(--muted); }
+.phases b { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--bg); color: var(--ink-2); font-size: .74rem; }
+.phases li.is-active { background: var(--engine-wash); border-color: var(--engine); color: var(--ink); }
+.phases li.is-active b { background: var(--engine); color: var(--on-fill); }
+.phases i { font-style: normal; color: var(--muted); }
+@media (max-width: 640px) { .phases { padding: 10px 16px; } .phases i { display: none; } }
+.term { background: var(--code-bg); color: var(--code-ink); display: grid; grid-template-rows: auto 1fr; min-height: 260px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 14px 16px 12px; border-bottom: 1px solid var(--code-chip); }
+.chip {
+  font-family: var(--f-mono); font-size: .78rem; padding: 6px 10px; border-radius: 7px; cursor: pointer;
+  color: var(--code-ink); background: var(--code-chip); border: 1px solid transparent; transition: border-color .15s, color .15s;
+}
+.chip:hover { border-color: var(--code-accent); color: var(--code-accent); }
+.chip .dim { color: var(--code-dim); }
+.log {
+  margin: 0; padding: 12px 16px 16px; overflow: auto; height: 210px;
+  font-size: .78rem; line-height: 1.65; white-space: pre-wrap; word-break: break-word; color: var(--code-ink);
+}
+.log .p { color: var(--code-dim); user-select: none; }
+.log .note { color: var(--code-dim); font-style: italic; }
+.log .out { color: var(--code-accent); }
+.log .ok { color: var(--code-ok); font-weight: 600; }
+@media (max-width: 860px) {
+  .console-grid { grid-template-columns: minmax(0, 1fr); }
+  .map-pane { border-right: 0; border-bottom: 1px solid var(--rule); }
+}
+
+/* map + render svg */
+.m-bg { fill: var(--surface); }
+.m-grid { stroke: var(--grid); stroke-width: 1; }
+.m-edge { fill: none; stroke: var(--rule); stroke-width: 1; }
+.m-tick { font-family: var(--f-mono); font-size: 11px; fill: var(--muted); }
+.m-fov { fill: var(--engine-wash); stroke: var(--engine); stroke-opacity: .45; stroke-width: 1; }
+.m-obj { transform-box: fill-box; transform-origin: center; transition: opacity .35s, transform .35s; }
+.m-obj.is-hidden { opacity: 0; transform: scale(.4); }
+.m-prox { stroke: var(--surface); stroke-width: 2; transition: stroke .2s; }
+.m-obj.is-seen .m-prox { stroke: var(--engine); stroke-width: 3; }
+.m-label { font-family: var(--f-ui); font-size: 13px; font-weight: 600; fill: var(--ink-2); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.m-cam-tri { fill: var(--ink); stroke: var(--surface); stroke-width: 2; stroke-linejoin: round; }
+.r-ring { stroke: var(--render-ring); stroke-width: 1; }
+.r-pill { fill: var(--engine); }
+.r-pill-text { font-family: var(--f-ui); font-size: 12px; font-weight: 600; fill: var(--on-fill); }
+.r-empty { font-family: var(--f-ui); font-size: 13px; fill: var(--render-floor); }
+
+/* ---------- figures ---------- */
+.plate { margin: 0; display: grid; gap: 14px; }
+.plate-scroll { background: var(--plate); border: 1px solid var(--rule); border-radius: 12px; padding: 16px; overflow-x: auto; }
+.plate-scroll a { display: block; }
+@media (max-width: 640px) { .plate-scroll img { max-width: none; width: 680px; } }
+.abstract { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 40px 56px; }
+.abstract-head { display: grid; gap: 12px; align-content: start; }
+.abstract-text { max-width: var(--prose); display: grid; gap: 14px; }
+.abstract-fig { grid-column: 1 / -1; }
+@media (max-width: 860px) { .abstract { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
+
+/* ---------- method ---------- */
+.flow { list-style: none; margin: 40px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
+.flow li { display: grid; gap: 10px; align-content: start; padding-top: 16px; border-top: 2px solid var(--ink); position: relative; min-width: 0; }
+.flow li:nth-child(2) { border-top-color: var(--engine); }
+.flow li + li::before {
+  content: "→"; position: absolute; left: -24px; top: -14px; width: 20px; text-align: center;
+  font-family: var(--f-ui); color: var(--muted); background: var(--bg);
+}
+.flow .io { font-family: var(--f-mono); font-size: .76rem; color: var(--muted); }
+.io b { font-weight: 500; color: var(--ink-2); }
+.flow p { font-size: 1rem; color: var(--ink-2); }
+@media (max-width: 820px) {
+  .flow { grid-template-columns: minmax(0, 1fr); }
+  .flow li + li::before { display: none; }
+}
+.tabs { margin-top: 56px; display: grid; gap: 16px; }
+.tablist { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab {
+  font-family: var(--f-ui); font-size: .9rem; font-weight: 600; padding: 8px 14px; border-radius: 999px; cursor: pointer;
+  background: transparent; color: var(--ink-2); border: 1px solid var(--rule);
+}
+.tab[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* ---------- results ---------- */
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-block: 1px solid var(--rule); margin-bottom: 64px; }
+.stat { padding: 22px 22px 22px 0; display: grid; gap: 4px; align-content: start; }
+.stat + .stat { padding-left: 22px; border-left: 1px solid var(--rule); }
+.stat-value { font-family: var(--f-ui); font-weight: 650; font-size: clamp(2.2rem, 4.6vw, 3.1rem); line-height: 1; letter-spacing: -.02em; }
+.stat-value small { font-size: .45em; font-weight: 600; color: var(--muted); margin-left: 2px; }
+.stat-label { font-family: var(--f-ui); font-size: .95rem; font-weight: 600; margin-top: 8px; }
+.stat-sub { font-family: var(--f-ui); font-size: .85rem; color: var(--muted); }
+@media (max-width: 720px) {
+  .stats { grid-template-columns: minmax(0, 1fr); }
+  .stat, .stat + .stat { padding: 18px 0; border-left: 0; }
+  .stat + .stat { border-top: 1px solid var(--rule); }
+}
+.figure-card { background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; padding: 22px 22px 18px; display: grid; gap: 16px; min-width: 0; }
+.figure-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 24px; }
+.fh-text { display: grid; gap: 6px; max-width: 60ch; }
+.fh-text p { font-family: var(--f-ui); font-size: .9rem; color: var(--muted); }
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--bg); border: 1px solid var(--rule); }
+.seg button {
+  font-family: var(--f-ui); font-size: .84rem; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 0; cursor: pointer;
+  background: transparent; color: var(--ink-2);
+}
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgb(16 32 43 / .14); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--f-ui); font-size: .85rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.key { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.key-base { background: var(--mark-base); }
+.key-sh { background: var(--mark-sh); }
+.chart-host { position: relative; min-width: 0; }
+.chart { display: block; overflow: visible; }
+.chart text { font-family: var(--f-ui); }
+.c-grid { stroke: var(--grid); stroke-width: 1; }
+.c-tick { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.c-label { font-size: 13px; fill: var(--ink-2); }
+.c-label.is-hl { fill: var(--ink); font-weight: 650; }
+.c-val { font-size: 13px; font-weight: 650; fill: var(--ink); font-variant-numeric: tabular-nums; }
+.c-val.is-dim { font-weight: 500; fill: var(--ink-2); }
+.c-delta { font-size: 12px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.c-link { stroke: var(--rule); stroke-width: 2; stroke-linecap: round; }
+.c-dot { stroke: var(--surface); stroke-width: 2; }
+.c-base { fill: var(--mark-base); }
+.c-sh { fill: var(--mark-sh); }
+.c-bar { fill: var(--mark-base); }
+.c-bar.is-hl { fill: var(--mark-sh); }
+.c-hit { fill: transparent; }
+.c-row:hover .c-hit, .c-row:focus .c-hit { fill: var(--engine-wash); fill-opacity: .55; }
+.c-row:focus { outline: none; }
+.tip {
+  position: absolute; z-index: 5; pointer-events: none; transform: translate(-50%, calc(-100% - 12px));
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; box-shadow: var(--shadow);
+  padding: 10px 12px; font-family: var(--f-ui); font-size: .82rem; min-width: 170px; display: grid; gap: 4px;
+}
+.tip-title { font-weight: 650; color: var(--ink); margin-bottom: 2px; }
+.tip-row { display: grid; grid-template-columns: 14px auto 1fr; align-items: center; gap: 8px; color: var(--muted); }
+.tip-row strong { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 650; }
+.tip-row i { width: 12px; height: 2px; border-radius: 1px; display: block; }
+.tip-row span { text-align: left; }
+details.numbers summary { cursor: pointer; font-family: var(--f-ui); font-size: .875rem; font-weight: 600; color: var(--engine-text); }
+details.numbers[open] summary { margin-bottom: 12px; }
+.table-scroll { overflow-x: auto; min-width: 0; }
+table.data { width: 100%; border-collapse: collapse; font-family: var(--f-ui); font-size: .88rem; font-variant-numeric: tabular-nums; }
+table.data th, table.data td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+table.data th:first-child, table.data td:first-child, table.data .l { text-align: left; }
+table.data thead th { font-weight: 600; font-size: .78rem; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--ink-2); }
+table.data tbody th { font-weight: 650; color: var(--ink); vertical-align: top; }
+table.data td { color: var(--ink-2); }
+table.data tr.is-sh td { background: var(--engine-wash); color: var(--ink); }
+table.data tr.is-sh td.l { font-weight: 650; }
+table.data td.best { font-weight: 700; color: var(--ink); }
+table.data tr.group-end > *, table.data tbody th[rowspan] { border-bottom-color: var(--ink-2); }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+@media (max-width: 860px) { .grid-2 { grid-template-columns: minmax(0, 1fr); } }
+.results-stack { display: grid; gap: 28px; }
+.subhead { margin-top: 44px; display: grid; gap: 8px; max-width: var(--prose); }
+
+/* ---------- cite ---------- */
+.codebox { position: relative; background: var(--code-bg); color: var(--code-ink); border-radius: 12px; min-width: 0; }
+.codebox pre { margin: 0; padding: 20px 20px 18px; overflow-x: auto; font-size: .8rem; line-height: 1.7; }
+.codebox .c { color: var(--code-dim); }
+.copy {
+  position: absolute; top: 10px; right: 10px; font-family: var(--f-ui); font-size: .78rem; font-weight: 600; cursor: pointer;
+  padding: 5px 10px; border-radius: 7px; border: 1px solid var(--code-chip); background: var(--code-chip); color: var(--code-ink);
+}
+.copy:hover { border-color: var(--code-accent); }
+footer { border-top: 1px solid var(--rule); padding-block: 36px 48px; }
+footer .frame { display: grid; gap: 8px; font-family: var(--f-ui); font-size: .875rem; color: var(--muted); }
+footer .contact { user-select: all; color: var(--ink-2); }
+
+@media (max-width: 640px) {
+  .hero { padding-block: 48px 32px; }
+  section.block { padding-block: 60px; }
+  .demo { padding-bottom: 60px; }
+  .question { padding: 18px 16px; }
+  .map-pane, .render-pane { padding: 14px 14px 12px; }
+  .figure-card { padding: 16px 14px 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="frame topbar-in">
+    <a class="wordmark" href="#top" aria-label="Spatial Harness, back to top">
+      <svg viewBox="0 0 22 22" aria-hidden="true"><rect x=".75" y=".75" width="20.5" height="20.5" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 .75v20.5M.75 11h20.5" stroke="currentColor" stroke-opacity=".25" stroke-width="1"/><path d="M5 16.5 9 6l4 10.5z" style="fill:var(--engine)"/><rect x="13.5" y="12" width="4.5" height="4.5" style="fill:var(--object)"/></svg>
+      Spatial Harness
+    </a>
+    <nav class="topnav" aria-label="Sections">
+      <a href="#demo">Demo</a><a href="#overview">Overview</a><a href="#method">Method</a><a href="#results">Results</a><a href="#cite">BibTeX</a>
+    </nav>
+    <a class="gh-link" href="https://github.com/tmlr-group/Spatial-Harness">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</header>
+
+<main>
+<section class="hero" id="top">
+  <div class="frame">
+    <p class="venue">NeurIPS 2026</p>
+    <h1>Spatial Harness</h1>
+    <p class="subtitle">Grounding Spatial Reasoning in Executable World States with Physics Engines</p>
+    <div class="hero-meta">
+    <div class="byline">
+      <ul class="authors">
+        <li>Chentao Cao<sup>1*</sup></li>
+        <li>Zhanke Zhou<sup>1*</sup></li>
+        <li>Sangni Duan<sup>1</sup></li>
+        <li>Bo Han<sup>1†</sup></li>
+        <li>Hang Li<sup>2</sup></li>
+      </ul>
+      <p class="affil"><span><sup>1</sup>TMLR Group, Department of Computer Science, Hong Kong Baptist University</span><span><sup>2</sup>ByteDance Seed</span></p>
+      <p class="notes"><sup>*</sup>Equal contribution &nbsp; <sup>†</sup>Correspondence</p>
+    <div class="links">
+      <a class="btn" href="https://arxiv.org/pdf/2611.11344">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.4" d="M4 1.5h5.5L13 5v9.5H4zM9.5 1.5V5H13M6 8.5h5M6 11h5"/></svg>
+        Paper
+      </a>
+      <a class="btn" href="https://arxiv.org/abs/2611.11344">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="M7 3H3v10h10V9M9.5 2.5h4v4M13.5 2.5 7.5 8.5"/></svg>
+        arXiv
+      </a>
+      <a class="btn btn-primary" href="https://github.com/tmlr-group/Spatial-Harness">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M5.5 4 1.5 8l4 4M10.5 4l4 4-4 4"/></svg>
+        Code
+      </a>
+      <a class="btn" href="#cite">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.4" d="M3 3.5h4v4H4.5L3 11M9 3.5h4v4h-2.5L9 11"/></svg>
+        BibTeX
+      </a>
+    </div>
+    </div>
+    <p class="lede">Spatial Harness writes the scene down as an explicit world state, loads it into the MuJoCo physics engine, and lets the VLM answer by executing viewpoint changes, measurements and renders on it. On MindCube it lifts Qwen3.5-27B from <strong>52.70%</strong> to <strong>71.14%</strong>; given the same annotated layout, it reaches <strong>98.25%</strong> where direct reasoning reaches 71.81%.</p>
+    </div>
+  </div>
+</section>
+
+<section class="demo" id="demo" aria-labelledby="demo-title">
+  <div class="frame">
+    <div class="sec-head">
+      <p class="eyebrow">Live engine · a MindCube question from the paper</p>
+      <h2 id="demo-title">Execute the turn</h2>
+      <p class="sec-lede">Replayed from the paper's run on this question. The Perceiver turns three photos and the question into a world state; the Reasoner then answers by writing Python against the engine, which computes what the camera sees. The replay loops; click any call to take over the camera.</p>
+    </div>
+
+    <div class="console">
+      <div class="question">
+        <div class="q-main">
+        <p class="q-text"><span class="q-tag">Question</span>Starting from View 1, turn 180°. What is behind you after the turn?</p>
+        <ol class="options" aria-label="Answer options">
+          <li data-opt="A"><b>A</b>Window</li>
+          <li data-opt="B"><b>B</b>Dressing table</li>
+          <li data-opt="C"><b>C</b>Grey-green decorative wall</li>
+        </ol>
+        </div>
+        <div class="q-actions">
+          <button class="btn btn-primary" type="button" id="replay" aria-pressed="false">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path id="replay-icon" d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>
+            <span id="replay-label">Play the run</span>
+          </button>
+          <button class="btn" type="button" id="reset">Reset</button>
+        </div>
+      </div>
+      <ol class="phases" aria-label="Pipeline stage">
+        <li data-phase="perceiver"><b>1</b><span>Perceiver<i> · builds the world state from the photos and the question</i></span></li>
+        <li data-phase="reasoner"><b>2</b><span>Reasoner<i> · answers by executing calls in MuJoCo</i></span></li>
+      </ol>
+      <div class="console-grid">
+        <figure class="pane map-pane">
+          <figcaption class="pane-label">World state · layout ℒ <span>top-down</span></figcaption>
+          <svg id="map" viewBox="0 0 440 440" role="img" aria-label="Top-down 10 by 10 grid with the camera, its 90 degree field of view, and three objects: grey-green decorative wall, dressing table and window"></svg>
+          <p class="pose" id="pose">camera [4, 4] · yaw 90° (up)</p>
+          <p class="caption">Replayed from the paper's run on MindCube item rotation_group020_q1_7 with Qwen3.5-27B. Perceiver lines are excerpts of its output; the engine responses and the three MuJoCo images are the originals. Your own calls use a simplified renderer. The grid is a MindCube cognitive map: 10 × 10 cells of 0.919 m, x to the right, y downward.</p>
+        </figure>
+        <div class="right-col">
+          <figure class="pane render-pane">
+            <figcaption class="pane-label"><b id="render-title">Last capture_image()</b> <span id="render-meta">yaw 90°</span></figcaption>
+            <div class="screen">
+              <img id="render-photo" alt="" hidden>
+              <svg id="render" viewBox="0 0 480 270" role="img" aria-label="Rendered view from the current camera pose"></svg>
+            </div>
+            <div hidden>
+              <img id="img-view1" src="static/images/view1.jpg" alt="">
+              <img id="img-view2" src="static/images/view2.jpg" alt="">
+              <img id="img-view3" src="static/images/view3.jpg" alt="">
+              <img id="img-scene" src="static/images/mujoco_scene.jpg" alt="">
+              <img id="img-cap-window" src="static/images/capture_window.jpg" alt="">
+              <img id="img-cap-wall" src="static/images/capture_wall.jpg" alt="">
+            </div>
+          </figure>
+          <div class="term">
+            <div class="chips" role="group" aria-label="Engine calls">
+              <button class="chip" type="button" data-call="set_camera">set_camera(<span class="dim">[4, 4], "up"</span>)</button>
+              <button class="chip" type="button" data-call="turn_left">turn_left()</button>
+              <button class="chip" type="button" data-call="turn_right">turn_right()</button>
+              <button class="chip" type="button" data-call="turn_around">turn_around()</button>
+              <button class="chip" type="button" data-call="move_forward">move_forward(<span class="dim">1</span>)</button>
+              <button class="chip" type="button" data-call="get_distances">get_distances()</button>
+              <button class="chip" type="button" data-call="capture_image">capture_image()</button>
+            </div>
+            <pre class="log" id="log" aria-live="polite"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="overview" aria-labelledby="overview-title">
+  <div class="frame abstract">
+    <div class="abstract-head">
+      <p class="eyebrow">Abstract</p>
+      <h2 id="overview-title">From imagined turns to executed ones</h2>
+    </div>
+    <div class="abstract-text">
+      <p>Spatial reasoning requires understanding how objects and observers are arranged in a scene and how their relations change with viewpoint or movement. Vision-language models (VLMs) typically perform both steps through <em>model-internal</em> reasoning, forming an <em>implicit</em> scene interpretation from partial views and imagining the consequences of spatial transformations. A misread scene can lead to a wrong answer, while even a correct interpretation does not ensure that imagined transformations satisfy spatial constraints.</p>
+      <p>We introduce Spatial Harness, which represents scenes as explicit and executable world states to ground spatial reasoning in physics-engine feedback. A Perceiver integrates scene constraints extracted from the question with specialized visual estimates to place objects and cameras in a shared coordinate frame. The resulting state is instantiated in a physics engine, where a Reasoner executes viewpoint changes and uses computed measurements and rendered views to guide reasoning.</p>
+      <p>We evaluate on MindCube, SAT, MMSI-Bench, and SpatialRGPT-Bench with open- and closed-weight VLMs. On MindCube, Spatial Harness improves Qwen3.5-27B from 52.70% to 71.14%, surpassing pySpatial by 7.52 percentage points. Given identical annotated object and camera poses, it reaches 98.25% versus 71.81% for model-internal reasoning.</p>
+    </div>
+    <figure class="plate abstract-fig">
+      <div class="plate-scroll"><a href="static/images/motivation.png"><img src="static/images/motivation.png" width="2200" height="650" loading="lazy" alt="Two rows compare reasoning paradigms. Top, model reasoning: a VLM infers an implicit representation, imagines the left turn without executing it, and answers IN FRONT, which is wrong. Bottom, Spatial Harness: the agent writes an executable world state, executes the turn in a physics engine, reads the feedback and answers BEHIND, which is correct."></a></div>
+      <figcaption class="caption"><b>Figure 1.</b> Both approaches go from scene representation through spatial transformation to the answer. Top: a VLM represents the scene implicitly and imagines the requested turn, leaving the result unchecked. Bottom: Spatial Harness builds an explicit world state and executes the turn in a physics engine, so both the estimated layout and the consequence of the turn can be inspected.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="block" id="method" aria-labelledby="method-title">
+  <div class="frame">
+    <div class="sec-head">
+      <h2 id="method-title">Perceive once, then compute</h2>
+      <p class="sec-lede">Spatial Harness separates perception from reasoning. Both run on the same VLM: the Perceiver equips it with perception models, the Reasoner with a physics engine. Every spatial judgment, such as what a turn brings into view, is computed by the engine from the state.</p>
+    </div>
+    <figure class="plate">
+      <div class="plate-scroll"><a href="static/images/overview.png"><img src="static/images/overview.png" width="2200" height="798" loading="lazy" alt="Overview diagram. Left: the question and three input views. Middle: the Perceiver with a text channel that parses entities, relations, viewpoints and query needs, and a visual channel with detection (LocateAnything-3B), depth (MoGe-2), orientation (Orient Anything V2) and camera pose (Reloc3r), followed by state compilation. Center: the JSON world state with layout, per-view observations and stated constraints. Right: the Reasoner issues Python calls to the MuJoCo engine and receives measurements and rendered views."></a></div>
+      <figcaption class="caption"><b>Figure 4.</b> The Perceiver combines question-derived constraints with specialized visual estimates, aligning camera frames and fusing observations into a JSON world state. The Reasoner instantiates the layout in MuJoCo and issues Python tool calls for viewpoint control, measurement and rendering.</figcaption>
+    </figure>
+    <ol class="flow">
+      <li>
+        <p class="io">in <b>images x, question q</b> → out <b>ŝ</b></p>
+        <h3>Perceiver</h3>
+        <p>Parses the question into entities, relations, viewpoints and query needs. Runs detection (LocateAnything-3B), depth (MoGe-2), orientation (Orient Anything V2) and relative camera pose (Reloc3r) on every view, then aligns the camera frames, fuses the observations and enforces the stated constraints.</p>
+      </li>
+      <li>
+        <p class="io">ŝ = (<b>ℒ</b>, <b>Ω</b>, <b>𝒞</b>)</p>
+        <h3>World state</h3>
+        <p>A shared layout ℒ with the position and heading of every entity and camera, the per-view observations Ω, and the constraints 𝒞 stated in the question. The engine is used only when the state holds every entity and camera pose the answer needs; otherwise the VLM answers from the images.</p>
+      </li>
+      <li>
+        <p class="io">in <b>x, q, ŝ, ℰ[ŝ]</b> → out <b>ŷ</b></p>
+        <h3>Reasoner</h3>
+        <p>Instantiates ℒ in MuJoCo as labeled proxies and writes Python calls that move the camera, measure distances and render views. Each result enters its context and decides the next call, for up to five steps; an answer counts only after at least one engine call.</p>
+      </li>
+    </ol>
+
+    <div class="tabs" data-tabs>
+      <div class="tablist" role="tablist" aria-label="Method figures">
+        <button class="tab" type="button" role="tab" id="tab-state" aria-controls="panel-state" aria-selected="true">World state</button>
+        <button class="tab" type="button" role="tab" id="tab-api" aria-controls="panel-api" aria-selected="false" tabindex="-1">Engine interface</button>
+        <button class="tab" type="button" role="tab" id="tab-example" aria-controls="panel-example" aria-selected="false" tabindex="-1">Worked example</button>
+      </div>
+      <figure class="plate" role="tabpanel" id="panel-state" aria-labelledby="tab-state">
+        <div class="plate-scroll"><a href="static/images/world_state.png"><img src="static/images/world_state.png" width="2400" height="685" loading="lazy" alt="World state diagram: per-view observations in camera-local coordinates are aligned to a shared frame using camera poses and the stated constraint that image 2 is 4 units ahead of image 1 and faces the opposite way, producing a shared layout JSON that is instantiated as labeled cylinders in a MuJoCo scene and rendered from image 2."></a></div>
+        <figcaption class="caption"><b>Figure 5.</b> Camera poses align per-view observations into one shared layout, instantiated in the engine as labeled proxies. The observations stay in the state, because alignment can lose what a single image shows.</figcaption>
+      </figure>
+      <figure class="plate" role="tabpanel" id="panel-api" aria-labelledby="tab-api" hidden>
+        <div class="plate-scroll"><a href="static/images/engine_api.png"><img src="static/images/engine_api.png" width="2200" height="605" loading="lazy" alt="Engine API panels: viewpoint control (turn_right changes heading, position unchanged; set_camera, rotate_left, move_forward), measurement (get_distances returns a dictionary of distances; get_current_view; describe_camera_motion), and rendering (capture_image returns an image path and the objects in view)."></a></div>
+        <figcaption class="caption"><b>Figure 6.</b> Representative <code>mujoco_sim</code> calls control the camera pose, return geometric measurements and render views of the same scene. The pose persists across calls.</figcaption>
+      </figure>
+      <figure class="plate" role="tabpanel" id="panel-example" aria-labelledby="tab-example" hidden>
+        <div class="plate-scroll"><a href="static/images/worked_example.jpg"><img src="static/images/worked_example.jpg" width="2200" height="1065" loading="lazy" alt="Ten-step trajectory: three input views linked by 90 degree right turns; the Perceiver builds the world state; the Reasoner sets the camera, turns around and captures a view showing the window, reasons that the window is in front, turns around again, captures the grey-green decorative wall, and answers C."></a></div>
+        <figcaption class="caption"><b>Figure 2.</b> The trajectory replayed in the demo above. After the requested 180° turn, the render shows the window ahead; the question asks what is behind, so the Reasoner turns again, sees the grey-green decorative wall and selects C.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="results" aria-labelledby="results-title">
+  <div class="frame">
+    <div class="sec-head">
+      <p class="eyebrow">Four benchmarks · seven VLMs</p>
+      <h2 id="results-title">Results</h2>
+      <p class="sec-lede">MindCube has 1,050 multiple-choice questions over a few real views, grouped by camera motion into Rotation, Among and Around. We also evaluate on SAT, MMSI-Bench and SpatialRGPT-Bench. All methods in a comparison use the same VLM.</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <p class="stat-value">71.14<small>%</small></p>
+        <p class="stat-label">MindCube, from images and question</p>
+        <p class="stat-sub">Base 52.70 · pySpatial 63.62</p>
+      </div>
+      <div class="stat">
+        <p class="stat-value">98.25<small>%</small></p>
+        <p class="stat-label">MindCube, same GT map for both</p>
+        <p class="stat-sub">Base with the map 71.81</p>
+      </div>
+      <div class="stat">
+        <p class="stat-value">83.31<small>%</small></p>
+        <p class="stat-label">SpatialRGPT-Bench</p>
+        <p class="stat-sub">Base 48.20 · pySpatial 39.79</p>
+      </div>
+    </div>
+
+    <div class="results-stack">
+      <div class="figure-card">
+        <div class="figure-head">
+          <div class="fh-text">
+            <h3 id="dumbbell-title">Same layout, different reasoning</h3>
+            <p id="dumbbell-sub">MindCube accuracy (%). Both methods receive the identical annotated map of object and camera poses.</p>
+          </div>
+          <div class="seg" role="group" aria-label="Evaluation setting">
+            <button type="button" data-mode="gt" aria-pressed="true">With the GT map</button>
+            <button type="button" data-mode="e2e" aria-pressed="false">Images and question only</button>
+          </div>
+        </div>
+        <div class="legend"><span><i class="key key-base"></i>Base (the VLM answers directly)</span><span><i class="key key-sh"></i>Spatial Harness</span></div>
+        <div class="chart-host" id="dumbbell"></div>
+        <p class="caption" id="dumbbell-note"></p>
+        <details class="numbers">
+          <summary>Show the numbers</summary>
+          <div class="table-scroll"><table class="data" id="dumbbell-table"></table></div>
+        </details>
+      </div>
+
+      <div class="figure-card">
+        <div class="fh-text"><h3 id="t-mindcube-title">Against tool-using baselines on MindCube</h3><p>End-to-end accuracy (%). MindJourney answers from views generated by a video world model; pySpatial writes Python programs over a 3D reconstruction. Bold: best per model and column.</p></div>
+        <div class="table-scroll"><table class="data" id="t-mindcube" aria-labelledby="t-mindcube-title"></table></div>
+      </div>
+
+      <div class="figure-card">
+        <div class="fh-text"><h3 id="t-cross-title">Three more benchmarks</h3><p>End-to-end results (%). SAT (500 synthetic questions) and MMSI-Bench report accuracy; SpatialRGPT-Bench reports the share of numerical estimates within its error tolerance. Avg is the mean of the three. Bold: best per model and column.</p></div>
+        <div class="table-scroll"><table class="data" id="t-cross" aria-labelledby="t-cross-title"></table></div>
+      </div>
+    </div>
+
+    <div class="subhead">
+      <h3>Where the gains come from</h3>
+      <p class="sec-lede">Ablations on MindCube with Qwen3.5-27B, overall accuracy (%).</p>
+    </div>
+    <div class="grid-2" style="margin-top:20px">
+      <div class="figure-card">
+        <div class="figure-head"><div class="fh-text"><h3>Engine feedback</h3><p>Same GT map in every condition; only the Reasoner's feedback changes. Extra turns alone add 6.00 points, engine feedback adds 26.44.</p></div></div>
+        <div class="chart-host" id="bars-feedback"></div>
+      </div>
+      <div class="figure-card">
+        <div class="figure-head"><div class="fh-text"><h3>Building the world state</h3><p>The Reasoner is fixed; only the source of the map changes. Both perception channels matter, the visual channel most.</p></div></div>
+        <div class="chart-host" id="bars-state"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="cite" aria-labelledby="cite-title">
+  <div class="frame">
+    <div class="sec-head">
+      <h2 id="cite-title">Citation</h2>
+    </div>
+    <div class="codebox">
+      <button class="copy" type="button" data-copy="bibtex">Copy</button>
+<pre id="bibtex">@inproceedings{cao2026spatialharness,
+    title={Spatial Harness: Grounding Spatial Reasoning in Executable World States with Physics Engines},
+    author={Chentao Cao and Zhanke Zhou and Sangni Duan and Bo Han and Hang Li},
+    booktitle={NeurIPS},
+    year={2026},
+}</pre>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="frame">
+    <p>Spatial Harness is built on <a href="https://github.com/tmlr-group/AlphaApollo">AlphaApollo</a> and uses <a href="https://github.com/google-deepmind/mujoco">MuJoCo</a>, <a href="https://huggingface.co/nvidia/LocateAnything-3B">LocateAnything</a>, <a href="https://github.com/microsoft/MoGe">MoGe</a>, <a href="https://github.com/SpatialVision/Orient-Anything-V2">Orient Anything V2</a> and <a href="https://github.com/ffrivera0/reloc3r">Reloc3r</a>.</p>
+    <p>Correspondence: Bo Han · <span class="contact">bhanml@comp.hkbu.edu.hk</span></p>
+  </div>
+</footer>
+
+<script>
+(() => {
+  "use strict";
+  const NS = "http://www.w3.org/2000/svg";
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = (s, r = document) => r.querySelector(s);
+  function el(tag, attrs, parent) {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function h(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  // Python-style float: 2.0, 1.414
+  const pyNum = v => { const r = Math.round(v * 1000) / 1000; return Number.isInteger(r) ? r.toFixed(1) : String(r); };
+
+  /* ------------------------------------------------------------------
+     Engine demo: a 2D stand-in for mujoco_sim over the world state that
+     the Perceiver built in the paper's run (MindCube rotation_group020_q1_7).
+     Yaw follows the engine: right 0°, up 90°, left 180°, down 270°,
+     counter-clockwise positive on the y-down cognitive-map grid.
+     ------------------------------------------------------------------ */
+  const OBJECTS = [
+    { name: "grey-green decorative wall", pos: [4, 1], color: "var(--p-wall)", label: "above" },
+    { name: "dressing table", pos: [6, 4], color: "var(--p-table)", label: "below" },
+    { name: "window", pos: [4, 5], color: "var(--p-window)", label: "below" },
+  ];
+  const FACING = { right: 0, up: 90, left: 180, down: 270 };
+  const START = { x: 4, y: 4, yaw: 90 };
+  const CELL = 40, MARGIN = 30, HALF_FOV = 45;
+  const RW = 480, RH = 270, HORIZON = 118, FOCAL = RW / 2, CAM_H = 0.6, OBJ_H = 0.95, OBJ_R = 0.22;
+  const px = x => MARGIN + (x + 0.5) * CELL;
+  const py = y => MARGIN + (y + 0.5) * CELL;
+  const rad = d => d * Math.PI / 180;
+  const norm = d => ((d % 360) + 360) % 360;
+
+  const mapSvg = $("#map"), renderSvg = $("#render"), logEl = $("#log"), poseEl = $("#pose"), metaEl = $("#render-meta");
+  const photoEl = $("#render-photo"), titleEl = $("#render-title");
+  const src = id => $(id).src;
+  let cam = { ...START }, camNode, fovNode, objNodes = [];
+
+  function drawMap() {
+    const defs = el("defs", {}, mapSvg);
+    el("rect", { x: MARGIN, y: MARGIN, width: 10 * CELL, height: 10 * CELL }, el("clipPath", { id: "grid-clip" }, defs));
+    el("rect", { x: MARGIN, y: MARGIN, width: 10 * CELL, height: 10 * CELL, class: "m-bg" }, mapSvg);
+    for (let i = 1; i < 10; i++) {
+      el("line", { x1: MARGIN + i * CELL, y1: MARGIN, x2: MARGIN + i * CELL, y2: MARGIN + 10 * CELL, class: "m-grid" }, mapSvg);
+      el("line", { x1: MARGIN, y1: MARGIN + i * CELL, x2: MARGIN + 10 * CELL, y2: MARGIN + i * CELL, class: "m-grid" }, mapSvg);
+    }
+    el("rect", { x: MARGIN + .5, y: MARGIN + .5, width: 10 * CELL - 1, height: 10 * CELL - 1, class: "m-edge" }, mapSvg);
+    for (let i = 0; i < 10; i++) {
+      el("text", { x: px(i), y: MARGIN - 10, class: "m-tick", "text-anchor": "middle" }, mapSvg).textContent = i;
+      el("text", { x: MARGIN - 12, y: py(i) + 3.5, class: "m-tick", "text-anchor": "middle" }, mapSvg).textContent = i;
+    }
+    fovNode = el("path", { class: "m-fov" }, el("g", { "clip-path": "url(#grid-clip)" }, mapSvg));
+    objNodes = OBJECTS.map(o => {
+      const g = el("g", { class: "m-obj" }, mapSvg);
+      el("circle", { cx: px(o.pos[0]), cy: py(o.pos[1]), r: 12, class: "m-prox", style: `fill:${o.color}` }, g);
+      const ly = o.label === "above" ? py(o.pos[1]) - 20 : py(o.pos[1]) + 29;
+      el("text", { x: px(o.pos[0]), y: ly, class: "m-label", "text-anchor": "middle" }, g).textContent = o.name;
+      return g;
+    });
+    camNode = el("g", {}, mapSvg);
+    el("polygon", { points: "15,0 -9,-11 -9,11", class: "m-cam-tri" }, camNode);
+  }
+
+  function facingName(yaw) {
+    const n = Math.round(norm(yaw));
+    const word = Object.keys(FACING).find(k => FACING[k] === n % 360);
+    return word ? `yaw ${n % 360}° (${word})` : `yaw ${n % 360}°`;
+  }
+
+  function placeCam(c) {
+    const cx = px(c.x), cy = py(c.y), R = 3.6 * CELL;
+    const a1 = rad(c.yaw - HALF_FOV), a2 = rad(c.yaw + HALF_FOV);
+    camNode.setAttribute("transform", `translate(${cx} ${cy}) rotate(${-c.yaw})`);
+    fovNode.setAttribute("d", `M${cx} ${cy}L${cx + Math.cos(a1) * R} ${cy - Math.sin(a1) * R}A${R} ${R} 0 0 0 ${cx + Math.cos(a2) * R} ${cy - Math.sin(a2) * R}Z`);
+    const pos = v => String(+v.toFixed(2));
+    poseEl.textContent = `camera [${pos(c.x)}, ${pos(c.y)}] · ${facingName(c.yaw)}`;
+  }
+
+  function animateTo(target) {
+    const from = { ...cam };
+    if (reduceMotion) { cam = target; placeCam(cam); return Promise.resolve(); }
+    return new Promise(done => {
+      const t0 = performance.now(), D = 520;
+      const step = now => {
+        const k = Math.min(1, (now - t0) / D);
+        const e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        placeCam({ x: from.x + (target.x - from.x) * e, y: from.y + (target.y - from.y) * e, yaw: from.yaw + (target.yaw - from.yaw) * e });
+        if (k < 1) requestAnimationFrame(step);
+        else { cam = target; placeCam(cam); done(); }
+      };
+      requestAnimationFrame(step);
+    });
+  }
+
+  function distances(c) {
+    return OBJECTS.map(o => ({ o, d: Math.hypot(o.pos[0] - c.x, o.pos[1] - c.y) }));
+  }
+
+  function inView(c) {
+    const seen = [];
+    for (const o of OBJECTS) {
+      const dx = o.pos[0] - c.x, dyUp = c.y - o.pos[1];
+      const d = Math.hypot(dx, dyUp);
+      if (d < 1e-6) continue;
+      const rel = norm(Math.atan2(dyUp, dx) * 180 / Math.PI - c.yaw + 180) - 180;
+      const z = d * Math.cos(rad(rel));
+      if (Math.abs(rel) <= HALF_FOV && z > 0.2) seen.push({ o, d, rel, z });
+    }
+    return seen.sort((a, b) => a.d - b.d);
+  }
+
+  // Shows a photo or an original MuJoCo image in the render pane.
+  function showPhoto(url, title, meta) {
+    photoEl.src = url;
+    photoEl.alt = title;
+    photoEl.hidden = false;
+    renderSvg.toggleAttribute("hidden", true);
+    titleEl.textContent = title;
+    metaEl.textContent = meta;
+  }
+
+  function drawRender(seen, c) {
+    photoEl.hidden = true;
+    renderSvg.toggleAttribute("hidden", false);
+    titleEl.textContent = "Last capture_image()";
+    renderSvg.textContent = "";
+    const defs = el("defs", {}, renderSvg);
+    const grad = el("linearGradient", { id: "cyl-shade", x1: 0, x2: 1, y1: 0, y2: 0 }, defs);
+    el("stop", { offset: "0", "stop-color": "#fff", "stop-opacity": ".28" }, grad);
+    el("stop", { offset: ".45", "stop-color": "#fff", "stop-opacity": "0" }, grad);
+    el("stop", { offset: "1", "stop-color": "#000", "stop-opacity": ".25" }, grad);
+    el("rect", { x: 0, y: 0, width: RW, height: HORIZON, style: "fill:var(--render-sky)" }, renderSvg);
+    el("rect", { x: 0, y: HORIZON, width: RW, height: RH - HORIZON, style: "fill:var(--render-floor)" }, renderSvg);
+    for (const d of [1, 1.5, 2, 3, 5]) {
+      const y = HORIZON + FOCAL * CAM_H / d;
+      el("line", { x1: 0, x2: RW, y1: y, y2: y, class: "r-ring" }, renderSvg);
+    }
+    const pills = [];
+    for (const v of [...seen].sort((a, b) => b.z - a.z)) {
+      const x = RW / 2 - Math.tan(rad(v.rel)) * FOCAL;
+      const w = FOCAL * 2 * OBJ_R / v.z;
+      const base = HORIZON + FOCAL * CAM_H / v.z, top = HORIZON + FOCAL * (CAM_H - OBJ_H) / v.z;
+      const ry = Math.max(2, w * .16), fill = `fill:${v.o.color}`;
+      const g = el("g", {}, renderSvg);
+      el("ellipse", { cx: x, cy: base, rx: w / 2, ry, style: fill }, g);
+      el("rect", { x: x - w / 2, y: top, width: w, height: base - top, style: fill }, g);
+      el("rect", { x: x - w / 2, y: top, width: w, height: base - top, fill: "url(#cyl-shade)" }, g);
+      el("ellipse", { cx: x, cy: top, rx: w / 2, ry, style: fill }, g);
+      el("ellipse", { cx: x, cy: top, rx: w / 2, ry, fill: "#fff", "fill-opacity": ".3" }, g);
+      pills.push({ x, y: top - ry, name: v.o.name });
+    }
+    pills.sort((a, b) => a.x - b.x);
+    let lastRight = -Infinity, lift = 0;
+    for (const p of pills) {
+      const w = p.name.length * 6.3 + 18;
+      let left = Math.min(Math.max(p.x - w / 2, 6), RW - w - 6);
+      lift = left < lastRight + 4 ? lift + 26 : 0;
+      const y = Math.max(6, p.y - 30 - lift);
+      el("rect", { x: left, y, width: w, height: 22, rx: 4, class: "r-pill" }, renderSvg);
+      el("text", { x: left + w / 2, y: y + 15, class: "r-pill-text", "text-anchor": "middle" }, renderSvg).textContent = p.name;
+      lastRight = left + w;
+    }
+    if (!seen.length) el("text", { x: RW / 2, y: HORIZON / 2 + 5, class: "r-empty", "text-anchor": "middle" }, renderSvg).textContent = "No objects in view";
+    metaEl.textContent = `${facingName(c.yaw)} · ${seen.length} in view`;
+    objNodes.forEach((n, i) => n.classList.toggle("is-seen", seen.some(v => v.o === OBJECTS[i])));
+  }
+
+  function log(text, kind) {
+    const line = h("span", kind ? `ln ${kind}` : "ln");
+    if (kind === "cmd") line.appendChild(h("span", "p", ">>> "));
+    line.appendChild(document.createTextNode(text + "\n"));
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  const captureInfo = seen => `[capture_info] {"objects_in_view": [${seen.map(v => `{"name": "${v.o.name}", "distance": ${pyNum(v.d)}}`).join(", ")}]}`;
+  const clamp = v => Math.min(9, Math.max(0, v));
+  const nearestYaw = target => cam.yaw + (norm(target - cam.yaw + 180) - 180);
+
+  const api = {
+    async set_camera(pos = [4, 4], facing = "up") {
+      log(`mujoco_sim.set_camera([${pos.join(", ")}], "${facing}")`, "cmd");
+      await animateTo({ x: pos[0], y: pos[1], yaw: nearestYaw(FACING[facing]) });
+    },
+    async turn_left() { log("mujoco_sim.turn_left()", "cmd"); await animateTo({ ...cam, yaw: cam.yaw + 90 }); },
+    async turn_right() { log("mujoco_sim.turn_right()", "cmd"); await animateTo({ ...cam, yaw: cam.yaw - 90 }); },
+    async turn_around() { log("mujoco_sim.turn_around()", "cmd"); await animateTo({ ...cam, yaw: cam.yaw + 180 }); },
+    async move_forward(d = 1) {
+      log(`mujoco_sim.move_forward(${d})`, "cmd");
+      const r = rad(cam.yaw);
+      await animateTo({ ...cam, x: clamp(cam.x + Math.cos(r) * d), y: clamp(cam.y - Math.sin(r) * d) });
+    },
+    async get_distances() {
+      log("print(mujoco_sim.get_distances())", "cmd");
+      log(`{${distances(cam).map(({ o, d }) => `'${o.name}': ${pyNum(d)}`).join(", ")}}`, "out");
+    },
+    async capture_image(original) {
+      log("image_path = mujoco_sim.capture_image()", "cmd");
+      const seen = inView(cam);
+      drawRender(seen, cam);
+      if (original) showPhoto(original, "capture_image() · MuJoCo", `${facingName(cam.yaw)} · from the paper's run`);
+      log(captureInfo(seen), "out");
+    },
+  };
+
+  const chips = [...document.querySelectorAll(".chip")];
+  const playBtn = $("#replay"), resetBtn = $("#reset");
+  let chain = Promise.resolve(), running = Promise.resolve(), runId = 0, wake = null;
+  const enqueue = fn => (chain = chain.then(fn).catch(err => console.error(err)));
+  // A pause that stop() can cut short, so a click takes over without waiting.
+  function pause(ms) {
+    return new Promise(r => {
+      const t = setTimeout(r, reduceMotion ? 0 : ms);
+      wake = () => { clearTimeout(t); r(); };
+    });
+  }
+  function markAnswer(opt) { document.querySelectorAll(".options li").forEach(li => li.classList.toggle("is-answer", li.dataset.opt === opt)); }
+  function setPhase(phase) { document.querySelectorAll(".phases li").forEach(li => li.classList.toggle("is-active", li.dataset.phase === phase)); }
+  let perceiving = false;
+  function showObjects(on) { objNodes.forEach(n => n.classList.toggle("is-hidden", !on)); }
+  // Engine calls need the whole world state, even if the replay stopped mid-Perceiver.
+  function ensureState() {
+    if (!perceiving) return;
+    perceiving = false;
+    showObjects(true);
+    setPhase("reasoner");
+  }
+
+  function boot() {
+    logEl.textContent = "";
+    markAnswer(null);
+    perceiving = false;
+    showObjects(true);
+    setPhase("reasoner");
+    cam = { ...START };
+    placeCam(cam);
+    log("# world state loaded: 3 objects, camera at View 1", "note");
+    log(`mujoco_sim.set_camera([4, 4], "up")`, "cmd");
+    log("image_path = mujoco_sim.capture_image()", "cmd");
+    const seen = inView(cam);
+    drawRender(seen, cam);
+    log(captureInfo(seen), "out");
+  }
+
+  // Perceiver: each view's photo, its camera heading and the observation it placed.
+  const VIEWS = [
+    { img: "#img-view1", yaw: 90, word: "up", source: "anchor of the shared frame", obj: "grey-green decorative wall",
+      line: "grey-green decorative wall: straight ahead, depth 2.5 m → (4.00, 1.25) → cell [4, 1]" },
+    { img: "#img-view2", yaw: 0, word: "right", source: "turned 90° right, stated in the question", obj: "dressing table",
+      line: "dressing table: 10° left, depth 1.5 m → (5.66, 3.70) → cell [6, 4]" },
+    { img: "#img-view3", yaw: 270, word: "down", source: "another 90° right, stated in the question", obj: "window",
+      line: "window: 14° right, depth 1.4 m → (3.62, 5.48) → cell [4, 5]" },
+  ];
+
+  function startPerception() {
+    logEl.textContent = "";
+    markAnswer(null);
+    perceiving = true;
+    setPhase("perceiver");
+    showObjects(false);
+    objNodes.forEach(n => n.classList.remove("is-seen"));
+    cam = { ...START };
+    placeCam(cam);
+    showPhoto(src(VIEWS[0].img), "Input · view 1", "camera facing up");
+  }
+
+  async function perceiveView(i) {
+    const v = VIEWS[i];
+    log(`# Perceiver, visual channel: view ${i + 1}, camera facing ${v.word} (${v.source})`, "note");
+    showPhoto(src(v.img), `Input · view ${i + 1}`, `camera facing ${v.word}`);
+    await animateTo({ ...cam, yaw: nearestYaw(v.yaw) });
+  }
+
+  function placeObject(i) {
+    const v = VIEWS[i];
+    log(v.line, "out");
+    objNodes[OBJECTS.findIndex(o => o.name === v.obj)].classList.remove("is-hidden");
+  }
+
+  // The paper's run on this question: Perceiver, then the Reasoner's two engine calls.
+  const TRAJECTORY = [
+    () => startPerception(),
+    () => log("# Perceiver, text channel: parse the question", "note"),
+    () => log("entities: window, dressing table, grey-green decorative wall", "out"),
+    () => log("viewpoints: one position; view 2 = view 1 turned 90° right; view 3 = another 90° right", "out"), () => pause(1500),
+    ...[0, 1, 2].flatMap(i => [() => perceiveView(i), () => pause(500), () => placeObject(i), () => pause(1100)]),
+    () => {
+      log("# world state compiled: 3 objects, 3 views; instantiate ℒ in MuJoCo", "note");
+      showPhoto(src("#img-scene"), "MuJoCo scene · instantiated ℒ", "from the paper's run");
+    }, () => pause(1800),
+    () => { perceiving = false; setPhase("reasoner"); },
+    () => log("# Reasoner, turn 1: requested 180° turn", "note"),
+    () => api.set_camera([4, 4], "up"), () => pause(200),
+    () => api.turn_around(), () => pause(200),
+    () => api.capture_image(src("#img-cap-window")), () => pause(1200),
+    () => log("# Window is in front; check behind.", "note"), () => pause(900),
+    () => log("# Reasoner, turn 2: inspect behind", "note"),
+    () => api.turn_around(), () => pause(200),
+    () => api.capture_image(src("#img-cap-wall")), () => pause(800),
+    () => { log("Answer: C. Grey-green decorative wall", "ok"); markAnswer("C"); },
+  ];
+
+  function setPlaying(on) {
+    playBtn.setAttribute("aria-pressed", String(on));
+    $("#replay-icon").setAttribute("d", on ? "M4 2.5h3v11H4zM9 2.5h3v11H9z" : "M4 2.5v11l9-5.5z");
+    $("#replay-label").textContent = on ? "Pause the run" : "Play the run";
+    logEl.setAttribute("aria-live", on ? "off" : "polite");
+  }
+
+  // Stops the trajectory at its next step; resolves once it has stopped.
+  function stop() {
+    runId++;
+    if (wake) wake();
+    setPlaying(false);
+    return running;
+  }
+
+  function play(loop) {
+    const id = ++runId;
+    setPlaying(true);
+    running = (async () => {
+      do {
+        for (const step of TRAJECTORY) {
+          if (id !== runId) return;
+          await step();
+        }
+        if (id !== runId) return;
+        await pause(3500);
+      } while (loop && id === runId);
+      if (id === runId) setPlaying(false);
+    })().catch(err => console.error(err));
+  }
+
+  drawMap();
+  boot();
+  chips.forEach(b => b.addEventListener("click", () => {
+    const call = b.dataset.call;
+    stop();
+    enqueue(async () => {
+      await running;
+      ensureState();
+      await (call === "set_camera" ? api.set_camera([4, 4], "up") : call === "move_forward" ? api.move_forward(1) : api[call]());
+    });
+  }));
+  playBtn.addEventListener("click", () => {
+    if (playBtn.getAttribute("aria-pressed") === "true") { stop(); return; }
+    enqueue(async () => { await stop(); play(!reduceMotion); });
+  });
+  resetBtn.addEventListener("click", () => enqueue(async () => { await stop(); boot(); }));
+  // Loop by default; with reduced motion, wait for a click and play once.
+  if (!reduceMotion) play(true);
+
+  /* ------------------------------------------------------------------
+     Results: numbers from the paper (Figure 3 and Tables 1-5).
+     ------------------------------------------------------------------ */
+  const MODELS = ["Qwen2.5-VL-7B", "Qwen2.5-VL-32B", "Qwen2.5-VL-72B", "Qwen3.5-27B", "Kimi K2.5", "GPT-5.4-mini", "GLM-5V-Turbo"];
+  const DUMBBELL = {
+    gt: {
+      base: [30.35, 46.35, 41.46, 71.81, 81.27, 44.79, 67.46],
+      sh: [56.51, 83.78, 84.22, 98.25, 94.10, 82.86, 89.68],
+      sub: "MindCube accuracy (%). Both methods receive the identical annotated map of object and camera poses.",
+      note: "With the same map, Spatial Harness is higher on every backbone, so the gain comes from executing the layout rather than from a better scene estimate.",
+      baseName: "Base with the GT map", shName: "Spatial Harness with the GT map",
+    },
+    e2e: {
+      base: [35.59, 40.16, 41.46, 52.70, 50.67, 44.25, 64.06],
+      sh: [35.71, 56.00, 55.33, 71.14, 72.67, 59.62, 64.67],
+      sub: "MindCube accuracy (%). The Perceiver estimates the world state from the images and the question; Base answers from the same input.",
+      note: "End to end, the gain depends on how well the backbone uses the Perceiver's estimate: from +0.12 points with Qwen2.5-VL-7B to +22.00 with Kimi K2.5.",
+      baseName: "Base", shName: "Spatial Harness",
+    },
+  };
+  const signed = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
+  let mode = "gt";
+
+  function drawDumbbell() {
+    const host = $("#dumbbell"), cfg = DUMBBELL[mode];
+    const W = Math.max(280, host.clientWidth);
+    const narrow = W < 560;
+    const labelW = narrow ? 0 : 136, valW = 104, rowH = narrow ? 50 : 38, top = 4, axisH = 24;
+    const x0 = narrow ? 8 : labelW + 16, x1 = W - valW - 10;
+    const sx = v => x0 + (x1 - x0) * v / 100;
+    const H = top + MODELS.length * rowH + axisH;
+    host.textContent = "";
+    const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: "chart", role: "list", "aria-label": `${cfg.shName} versus ${cfg.baseName} on MindCube for seven VLMs` }, host);
+    for (const t of [0, 25, 50, 75, 100]) {
+      el("line", { x1: sx(t), x2: sx(t), y1: top, y2: H - axisH + 2, class: "c-grid" }, svg);
+      el("text", { x: sx(t), y: H - 6, class: "c-tick", "text-anchor": "middle" }, svg).textContent = t;
+    }
+    const tip = h("div", "tip");
+    tip.hidden = true;
+    host.appendChild(tip);
+    MODELS.forEach((name, i) => {
+      const b = cfg.base[i], s = cfg.sh[i], y = top + i * rowH;
+      const cy = narrow ? y + rowH - 14 : y + rowH / 2;
+      const g = el("g", { class: "c-row", tabindex: 0, role: "listitem", "aria-label": `${name}: ${cfg.baseName} ${b.toFixed(2)}, ${cfg.shName} ${s.toFixed(2)}, gain ${signed(s - b)} points` }, svg);
+      el("rect", { x: 0, y, width: W, height: rowH, class: "c-hit" }, g);
+      const label = el("text", narrow ? { x: x0, y: y + 17, class: "c-label" } : { x: labelW, y: cy + 4.5, class: "c-label", "text-anchor": "end" }, g);
+      label.textContent = name;
+      if (name === "Qwen3.5-27B") label.classList.add("is-hl");
+      el("line", { x1: sx(Math.min(b, s)), x2: sx(Math.max(b, s)), y1: cy, y2: cy, class: "c-link" }, g);
+      el("circle", { cx: sx(b), cy, r: 6, class: "c-dot c-base" }, g);
+      el("circle", { cx: sx(s), cy, r: 6, class: "c-dot c-sh" }, g);
+      el("text", { x: x1 + 14, y: cy + 4.5, class: "c-val" }, g).textContent = s.toFixed(2);
+      el("text", { x: W - 2, y: cy + 4.5, class: "c-delta", "text-anchor": "end" }, g).textContent = signed(s - b);
+      const show = () => {
+        tip.textContent = "";
+        tip.appendChild(h("div", "tip-title", name));
+        for (const [v, lbl, key] of [[s, cfg.shName, "var(--mark-sh)"], [b, cfg.baseName, "var(--mark-base)"]]) {
+          const row = h("div", "tip-row");
+          const k = h("i"); k.style.background = key;
+          row.append(k, h("strong", null, v.toFixed(2)), h("span", null, lbl));
+          tip.appendChild(row);
+        }
+        const gain = h("div", "tip-row");
+        gain.append(h("i"), h("strong", null, signed(s - b)), h("span", null, "points"));
+        tip.appendChild(gain);
+        tip.hidden = false;
+        tip.style.left = `${Math.min(Math.max(sx(Math.max(b, s)), 100), W - 100)}px`;
+        tip.style.top = `${cy - 4}px`;
+      };
+      const hide = () => { tip.hidden = true; };
+      g.addEventListener("pointerenter", show);
+      g.addEventListener("pointerleave", hide);
+      g.addEventListener("focus", show);
+      g.addEventListener("blur", hide);
+    });
+    $("#dumbbell-sub").textContent = cfg.sub;
+    $("#dumbbell-note").textContent = cfg.note;
+    const table = $("#dumbbell-table");
+    table.textContent = "";
+    const head = table.createTHead().insertRow();
+    for (const t of ["Model", cfg.baseName, cfg.shName, "Gain"]) head.appendChild(h("th", null, t));
+    const body = table.createTBody();
+    MODELS.forEach((name, i) => {
+      const r = body.insertRow();
+      r.appendChild(h("th", null, name));
+      for (const v of [cfg.base[i].toFixed(2), cfg.sh[i].toFixed(2), signed(cfg.sh[i] - cfg.base[i])]) r.appendChild(h("td", null, v));
+    });
+  }
+
+  document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+    mode = b.dataset.mode;
+    document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    drawDumbbell();
+  }));
+
+  function drawBars(id, rows, label) {
+    const host = $("#" + id);
+    const W = Math.max(260, host.clientWidth);
+    const rowH = 46, top = 2, axisH = 22, valW = 50;
+    const x0 = 0, x1 = W - valW, sx = v => x0 + (x1 - x0) * v / 100;
+    const H = top + rows.length * rowH + axisH;
+    host.textContent = "";
+    const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img", "aria-label": label }, host);
+    for (const t of [0, 25, 50, 75, 100]) {
+      el("line", { x1: sx(t) + (t === 0 ? .5 : 0), x2: sx(t) + (t === 0 ? .5 : 0), y1: top, y2: H - axisH + 2, class: "c-grid" }, svg);
+      el("text", { x: Math.min(Math.max(sx(t), 6), W - 14), y: H - 5, class: "c-tick", "text-anchor": "middle" }, svg).textContent = t;
+    }
+    rows.forEach(([name, v, hl], i) => {
+      const y = top + i * rowH, by = y + 22, bh = 14, xe = sx(v), r = 4;
+      const t = el("text", { x: 0, y: y + 15, class: "c-label" + (hl ? " is-hl" : "") }, svg);
+      t.textContent = name;
+      el("path", { d: `M${x0} ${by}H${xe - r}A${r} ${r} 0 0 1 ${xe} ${by + r}V${by + bh - r}A${r} ${r} 0 0 1 ${xe - r} ${by + bh}H${x0}Z`, class: "c-bar" + (hl ? " is-hl" : "") }, svg);
+      el("text", { x: xe + 6, y: by + 11.5, class: "c-val" + (hl ? "" : " is-dim") }, svg).textContent = v.toFixed(2);
+    });
+  }
+  const FEEDBACK = [["Base, answers from the map", 71.81], ["Multi-turn self-review", 77.81], ["Numerical feedback only", 95.62], ["Rendered feedback only", 93.71], ["Spatial Harness, both", 98.25, true]];
+  const STATE = [["VLM-generated map", 41.33], ["Perceiver without visual channel", 52.95], ["Perceiver without text channel", 68.38], ["Full Perceiver (Spatial Harness)", 71.14, true], ["GT map, for reference", 98.25]];
+
+  /* Tables 2 and 3 */
+  function fillTable(id, cols, groups) {
+    const table = $("#" + id);
+    const head = table.createTHead().insertRow();
+    ["Model", "Method", ...cols].forEach((c, i) => { const th = h("th", i < 2 ? "l" : null, c); th.scope = "col"; head.appendChild(th); });
+    const body = table.createTBody();
+    for (const [model, rows] of groups) {
+      const best = cols.map((_, j) => Math.max(...rows.map(r => r[j + 1])));
+      rows.forEach((r, i) => {
+        const tr = body.insertRow();
+        if (r[0] === "Spatial Harness") tr.className = "is-sh";
+        if (i === rows.length - 1) tr.classList.add("group-end");
+        if (i === 0) { const th = h("th", null, model); th.rowSpan = rows.length; th.scope = "rowgroup"; tr.appendChild(th); }
+        tr.appendChild(h("td", "l", r[0]));
+        cols.forEach((_, j) => tr.appendChild(h("td", r[j + 1] === best[j] ? "best" : null, r[j + 1].toFixed(2))));
+      });
+    }
+  }
+  fillTable("t-mindcube", ["Rotation", "Among", "Around", "Overall"], [
+    ["Qwen2.5-VL-72B", [["Base", 40.83, 41.06, 42.93, 41.46], ["MindJourney", 42.00, 40.50, 49.20, 42.86], ["pySpatial", 30.50, 55.50, 53.60, 50.29], ["Spatial Harness", 49.50, 58.00, 53.60, 55.33]]],
+    ["Qwen3.5-27B", [["Base", 77.17, 41.72, 59.47, 52.70], ["MindJourney", 82.00, 42.00, 65.60, 55.24], ["pySpatial", 61.50, 59.00, 76.40, 63.62], ["Spatial Harness", 81.50, 68.00, 70.40, 71.14]]],
+    ["Kimi K2.5", [["Base", 69.67, 42.78, 54.40, 50.67], ["MindJourney", 68.00, 42.50, 53.60, 50.00], ["pySpatial", 62.50, 65.17, 75.60, 67.14], ["Spatial Harness", 85.50, 68.17, 73.20, 72.67]]],
+    ["GPT-5.4-mini", [["Base", 28.83, 42.72, 60.27, 44.25], ["MindJourney", 30.00, 50.33, 59.60, 48.67], ["pySpatial", 38.50, 56.33, 69.60, 56.10], ["Spatial Harness", 49.50, 59.83, 67.20, 59.62]]],
+  ]);
+  fillTable("t-cross", ["SAT", "MMSI-Bench", "SpatialRGPT", "Avg"], [
+    ["Qwen2.5-VL-72B", [["Base", 68.60, 29.60, 40.72, 46.31], ["MindJourney", 68.60, 30.60, 39.12, 46.11], ["pySpatial", 55.40, 33.20, 31.64, 40.08], ["Spatial Harness", 71.60, 29.00, 84.11, 61.57]]],
+    ["Qwen3.5-27B", [["Base", 81.80, 33.40, 48.20, 54.47], ["MindJourney", 78.40, 33.00, 45.66, 52.35], ["pySpatial", 68.00, 36.70, 39.79, 48.16], ["Spatial Harness", 83.20, 39.50, 83.31, 68.67]]],
+  ]);
+
+  function drawCharts() {
+    drawDumbbell();
+    drawBars("bars-feedback", FEEDBACK, "MindCube accuracy by feedback condition with the GT map");
+    drawBars("bars-state", STATE, "MindCube accuracy by map source");
+  }
+  drawCharts();
+  let lastW = 0, raf = 0;
+  new ResizeObserver(() => {
+    const w = $("#dumbbell").clientWidth;
+    if (w === lastW) return;
+    lastW = w;
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(drawCharts);
+  }).observe($("#results .frame"));
+
+  /* Tabs */
+  document.querySelectorAll("[data-tabs]").forEach(box => {
+    const tabs = [...box.querySelectorAll('[role="tab"]')];
+    const select = t => tabs.forEach(x => {
+      const on = x === t;
+      x.setAttribute("aria-selected", String(on));
+      x.tabIndex = on ? 0 : -1;
+      document.getElementById(x.getAttribute("aria-controls")).hidden = !on;
+    });
+    tabs.forEach((t, i) => {
+      t.addEventListener("click", () => select(t));
+      t.addEventListener("keydown", e => {
+        const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+        if (!d) return;
+        const n = tabs[(i + d + tabs.length) % tabs.length];
+        select(n); n.focus();
+      });
+    });
+  });
+
+  /* Copy buttons */
+  document.querySelectorAll("[data-copy]").forEach(btn => btn.addEventListener("click", () => {
+    const pre = document.getElementById(btn.dataset.copy);
+    const done = () => { btn.textContent = "Copied"; setTimeout(() => { btn.textContent = "Copy"; }, 1600); };
+    const fallback = () => {
+      const range = document.createRange();
+      range.selectNodeContents(pre);
+      const sel = window.getSelection();
+      sel.removeAllRanges(); sel.addRange(range);
+      btn.textContent = "Selected, press Ctrl+C";
+    };
+    try { navigator.clipboard.writeText(pre.textContent).then(done, fallback); } catch (e) { fallback(); }
+  }));
+})();
+</script>
+</body>
+</html>
